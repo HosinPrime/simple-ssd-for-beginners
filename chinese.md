@@ -32,7 +32,12 @@ conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
 
 # 训练
 - 首先从 https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth 下载VGG的预训练权重来作为我们基础网络的初始权重
-- 编辑config.py里面的文件，里面参数的含义都有注释，一般来说你需要关注的是VOC_ROOT，将其填写为准备工作里面你的VOC数据存放的地方
+```Shell
+mkdir weights
+cd weights
+wget https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth
+```
+- 编辑config.py里面的文件，里面参数的含义都有注释，一般来说你需要关注的是VOC_ROOT，将其填写为准备工作里面你的VOC数据存放的地方
 - 运行程序
 ```Shell
 python train.py

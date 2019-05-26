@@ -21,6 +21,11 @@ then ~/VOCdevkit is your VOC root.
 
 # Train
 - for training ssd you need pretrained VGG weights as your basenet's starting point. so download this weight from https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth, then put it in *weights* folder.
+```Shell
+mkdir weights
+cd weights
+wget https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth
+```
 
 - vim config.py to change learning rate and batch size num...... and so on. It's not really neccesery, some thing you need to care about is VOC_ROOT, change it to your VOC root where you put your VOC data.
 - A simple command is all you need
