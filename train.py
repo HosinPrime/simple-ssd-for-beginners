@@ -2,7 +2,6 @@
 
 
 
-from voc_dataset import VOCDetection
 from config import opt
 import numpy as np
 from lib.model import SSD
@@ -13,7 +12,8 @@ from lib.utils import detection_collate
 
 from lib.multibox_encoder import MultiBoxEncoder
 from lib.ssd_loss import MultiBoxLoss
-from lib.augmentations import SSDAugmentation
+
+from voc_dataset import VOCDetection
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -61,12 +61,11 @@ if __name__ == '__main__':
 
     mb = MultiBoxEncoder(opt)
         
-
-    dataset = VOCDetection(opt.VOC_ROOT, transform=SSDAugmentation(size=opt.min_size))
+    image_sets = [['2007', 'trainval'], ['2012', 'trainval']]
+    dataset = VOCDetection(opt, image_sets=image_sets, is_train=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batch_size, collate_fn=detection_collate, num_workers=4)
 
     criterion = MultiBoxLoss(opt.num_classes, opt.neg_radio).to(device)
-    #criterion = HardLoss(opt.num_classes, opt.neg_radio)
 
     optimizer = torch.optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum,
                           weight_decay=opt.weight_decay)

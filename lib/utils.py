@@ -89,62 +89,60 @@ def nms(boxes, score, threshold=0.4):
     return pick
 
 
-def detect(locations, scores, w, h, nms_threshold=0.5, obj_threshold=0.1):
-    '''
-    
-    This function will detect object from predicted locations accoding to their
-    scores.
-    
-    locations (num_anchors, 4)
-    scores (num_anchors, num_classes) 0 is background
-    w, h is the src image's width and heights, ssd use it to map predlocations back
-    to the src image
-    
-    return
-    gt_labels (m,)
-    gt_conf (m, )
-    gt_location (m, 4)
-    '''
-    #这里得到的预测是(num_anchors, num_classes)大小的形式,为了找出每一个类别的物体，我们先进行转置操作
-    #然后0号是背景，将其去除
-    scores = scores.transpose(1, 0)[1:, :]
-    num_classes = scores.shape[0]
-    
-    gt_conf = []
-    gt_locations = []
-    gt_labels = []
-    for i in range(num_classes):
-        #对于每一类物体先通过置信度排序然后去找置信度大于阈值的那些物体
-        prob = scores[i]
-        sort_idx = prob.argsort()[::-1]
-        sort_prob = prob[sort_idx]
-        j = 0
-        one_score = []
-        one_boxes = []
-        one_labels = []
-        while sort_prob[j] > obj_threshold:
-            one_score.append(sort_prob[j])
-            one_boxes.append(locations[sort_idx[j]])
-            j += 1
-        
-        #nms
-        if len(one_score) > 0:
-            #将置信度较高的这些物体中iou较大的剔除
-            one_score = np.array(one_score)
-            one_boxes = np.array(one_boxes)
 
-            pick = nms(one_boxes, one_score, nms_threshold)
-            one_labels += [i]*len(pick)
-            one_score = one_score[pick]
-            #将归一化的预测通过原图大小返回去
-            one_boxes = one_boxes[pick] * np.array([w, h, w, h])
-            one_boxes = one_boxes.astype(int)
-            
-            gt_conf.extend(one_score)
-            gt_locations.extend(one_boxes)
-            gt_labels.extend(one_labels)
+
+def detect(locations, scores, nms_threshold, gt_threshold):
+    '''
+    locations : decode过后的坐标 (num_anchors, 4)
+    scores : 预测出来的分数 (num_anchors, 21)
+    nms_threshold : nms的阈值
+    gt_threshold : 认为是真实物体ground truth的阈值
+    '''
+
+    scores = scores[:, 1:] #第0类是背景,过滤掉
+
+    #存放最后保留物体的信息,他的坐标,置信度以及属于哪一类
+    keep_boxes = []
+    keep_confs = []
+    keep_labels = []
+    
+    #对每一类进行检测
+    for i in range(scores.shape[1]):
+        #得到这一类中可能有物体的anchor
+        mask = scores[:, i] >= gt_threshold
+        label_scores = scores[mask, i] 
+        label_boxes = locations[mask]
+        #没有找到直接下一个类别
+        if len(label_scores) == 0:
+            continue
+
+        #进行nms
+        pick = nms(label_boxes, label_scores, threshold=nms_threshold)
+        label_scores = label_scores[pick]
+        label_boxes = label_boxes[pick]
         
-    return np.array(gt_labels), np.array(gt_conf), np.array(gt_locations)
+
+        keep_boxes.append(label_boxes.reshape(-1))
+        keep_confs.append(label_scores)
+        keep_labels.extend([i]*len(label_scores))
+    
+    #没有找到任何一个物体
+    if len(keep_boxes) == 0:
+        return np.array([]), np.array([]), np.array([])
+        
+    
+    keep_boxes = np.concatenate(keep_boxes, axis=0).reshape(-1, 4)
+
+    keep_confs = np.concatenate(keep_confs, axis=0)
+    keep_labels = np.array(keep_labels).reshape(-1)
+#     print(keep_boxes.shape)
+#     print(keep_confs.shape)
+#     print(keep_labels.shape)
+
+    return keep_boxes, keep_confs, keep_labels
+
+
+
 
 
 def draw_rectangle(src_img, labels, conf, locations, label_map):
@@ -173,6 +171,6 @@ def draw_rectangle(src_img, labels, conf, locations, label_map):
         cv2.putText(img, label_map[labels[i]], tl,
                     FONT, 1, (255, 255, 255), 2)
     
-    #img = img[:, :, ::-1]
+    img = img[:, :, ::-1]
 
     return img

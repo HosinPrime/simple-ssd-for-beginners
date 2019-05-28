@@ -72,6 +72,18 @@ jupyter notebook
 <img align="center" src= "https://github.com/HosinPrime/simple-ssd-for-beginners/blob/master/images/2.jpg" height = 400/>
 
 
+# 测试
+现在提供了测试代码在VOC2007 testset上面计算MAP,MAP的计算函数是从FaceBook开源的[Detectron](https://github.com/facebookresearch/Detectron/blob/master/detectron/datasets/voc_eval.py)里面拿过来的,然后eval部分的代码基本与demo之中保持一致.进行MAP的计算请运行
+```Shell
+python eval.py --model=weights/VOC_LAST.pth --save_folder=result
+```
+程式运行完毕会在屏幕打印出各类别的map以及平均的map</br></br>
+- 一些注意点</br>
+其中model是你训练出的存放在weights里面用来测map的模型点,save_folder是存放每一类预测结果的文件夹,运行完程序后会生成一个result(--save_folder的参数)文件夹和一个annotations_cache文件夹，其中annotations_cache文件夹是MAP计算的时候存放真实标注临时信息的文件夹,由MAP计算函数产生
+    * Todo
+        * 尽可能训练一个map高的模型
+
+
 ## 引用
 - Wei Liu, et al. "SSD: Single Shot MultiBox Detector." [ECCV2016](http://arxiv.org/abs/1512.02325).
 - The code were mainly inspired by Those two repo, thanks for them for shareing us so elegant work

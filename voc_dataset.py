@@ -1,138 +1,122 @@
-"""VOC Dataset Classes
 
-Original author: Francisco Massa
-https://github.com/fmassa/vision/blob/voc_dataset/torchvision/datasets/voc.py
 
-Updated by: Ellis Brown, Max deGroot
-"""
-from config import opt
-import os.path as osp
-import sys
+
+
+
+
 import torch
 import torch.utils.data as data
-import cv2
+import xml.etree.ElementTree as ET
 import numpy as np
-if sys.version_info[0] == 2:
-    import xml.etree.cElementTree as ET
-else:
-    import xml.etree.ElementTree as ET
 
-VOC_CLASSES = (  # always index 0
-    'aeroplane', 'bicycle', 'bird', 'boat',
-    'bottle', 'bus', 'car', 'cat', 'chair',
-    'cow', 'diningtable', 'dog', 'horse',
-    'motorbike', 'person', 'pottedplant',
-    'sheep', 'sofa', 'train', 'tvmonitor')
+import os
+import cv2
+from config import opt
 
+from lib.augmentations import preproc_for_test, preproc_for_train
 
+VOC_LABELS = (
+        'aeroplane',
+        'bicycle',
+        'bird',
+        'boat',
+        'bottle',
+        'bus',
+        'car',
+        'cat',
+        'chair',
+        'cow',
+        'diningtable',
+        'dog',
+        'horse',
+        'motorbike',
+        'person',
+        'pottedplant',
+        'sheep',
+        'sofa',
+        'train',
+        'tvmonitor',
+    )
 
-class VOCAnnotationTransform(object):
-    """Transforms a VOC annotation into a Tensor of bbox coords and label index
-    Initilized with a dictionary lookup of classnames to indexes
-
-    Arguments:
-        class_to_ind (dict, optional): dictionary lookup of classnames -> indexes
-            (default: alphabetic indexing of VOC's 20 classes)
-        keep_difficult (bool, optional): keep difficult instances or not
-            (default: False)
-        height (int): height
-        width (int): width
-    """
-
-    def __init__(self, class_to_ind=None, keep_difficult=False):
-        self.class_to_ind = class_to_ind or dict(
-            zip(VOC_CLASSES, range(len(VOC_CLASSES))))
-        self.keep_difficult = keep_difficult
-
-    def __call__(self, target, width, height):
-        """
-        Arguments:
-            target (annotation) : the target annotation to be made usable
-                will be an ET.Element
-        Returns:
-            a list containing lists of bounding boxes  [bbox coords, class name]
-        """
-        res = []
-        for obj in target.iter('object'):
-            difficult = int(obj.find('difficult').text) == 1
-            if not self.keep_difficult and difficult:
-                continue
-            name = obj.find('name').text.lower().strip()
-            bbox = obj.find('bndbox')
-
-            pts = ['xmin', 'ymin', 'xmax', 'ymax']
-            bndbox = []
-            for i, pt in enumerate(pts):
-                cur_pt = int(bbox.find(pt).text) - 1
-                # scale height or width
-                cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
-                bndbox.append(cur_pt)
-            label_idx = self.class_to_ind[name]
-            bndbox.append(label_idx)
-            res += [bndbox]  # [xmin, ymin, xmax, ymax, label_ind]
-            # img_id = target.find('filename').text[:-4]
-
-        return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
 
 class VOCDetection(data.Dataset):
-    """VOC Detection Dataset Object
 
-    input is image, target is annotation
 
-    Arguments:
-        root (string): filepath to VOCdevkit folder.
-        image_set (string): imageset to use (eg. 'train', 'val', 'test')
-        transform (callable, optional): transformation to perform on the
-            input image
-        target_transform (callable, optional): transformation to perform on the
-            target `annotation`
-            (eg: take in caption string, return tensor of word indices)
-        dataset_name (string, optional): which dataset to load
-            (default: 'VOC2007')
-    """
+    def __init__(self, opt, image_sets=[['2007', 'trainval'], ['2012', 'trainval']], is_train=True):
 
-    def __init__(self, root,
-                 image_sets=[('2007', 'trainval'), ('2012', 'trainval')],
-                 transform=None, target_transform=VOCAnnotationTransform(),
-                 dataset_name='VOC0712'):
-        self.root = root
-        self.image_set = image_sets
-        self.transform = transform
-        self.target_transform = target_transform
-        self.name = dataset_name
-        self._annopath = osp.join('%s', 'Annotations', '%s.xml')
-        self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
-        self.ids = list()
-        for (year, name) in image_sets:
-            rootpath = osp.join(self.root, 'VOC' + year)
-            for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
-                self.ids.append((rootpath, line.strip()))
 
+        #你的voc root
+        self.root = opt.VOC_ROOT
+        #使用的数据集列表,每个数据集包括年份和使用的部分
+        self.image_sets = image_sets
+        self.is_train = is_train
+        self.opt = opt    #我们需要知道在预处理的时候要将图片resize到多大以及减去的方差等信息
+    
+        self.ids = []
+        #遍历数据集将图片得路径加到id里面
+        for (year, name) in self.image_sets:
+            root_path = os.path.join(self.root, 'VOC' + year)
+            ano_file = os.path.join(root_path, 'ImageSets', 'Main', name + '.txt')
+    
+            with open(ano_file, 'r') as f:
+                for line in f.readlines():
+                    line = line.strip()
+                    ano_path = os.path.join(root_path, 'Annotations', line + '.xml')
+                    img_path = os.path.join(root_path, 'JPEGImages', line + '.jpg')
+                    self.ids.append((img_path, ano_path))
+
+
+
+    
+    
     def __getitem__(self, index):
-        im, gt, h, w = self.pull_item(index)
+        img_path, ano_path = self.ids[index]
+        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        boxes, labels = self.get_annotations(ano_path)
+        
+        if self.is_train:
+            image, boxes, labels = preproc_for_train(image, boxes, labels, opt.min_size, opt.mean)
+            image = torch.from_numpy(image)
+           
+        
+        
+        target = np.concatenate([boxes, labels.reshape(-1,1)], axis=1)
+        
+        return image, target
 
-        return im, gt
+
+
+    def get_annotations(self, path):
+        
+        tree = ET.parse(path)
+
+        #得到真实坐标和标签
+        boxes = []
+        labels = []
+        
+        for child in tree.getroot():
+            if child.tag != 'object':
+                continue
+
+            bndbox = child.find('bndbox')
+            box =[
+                float(bndbox.find(t).text) - 1
+                for t in ['xmin', 'ymin', 'xmax', 'ymax']
+            ]
+
+
+            label = VOC_LABELS.index(child.find('name').text) 
+            
+            boxes.append(box)
+            labels.append(label)
+
+
+        return np.array(boxes), np.array(labels)
+            
+
+        
 
     def __len__(self):
         return len(self.ids)
-
-    def pull_item(self, index):
-        img_id = self.ids[index]
-
-        target = ET.parse(self._annopath % img_id).getroot()
-        img = cv2.imread(self._imgpath % img_id)
-        height, width, channels = img.shape
-
-        if self.target_transform is not None:
-            target = self.target_transform(target, width, height)
-
-        if self.transform is not None:
-            target = np.array(target)
-            img, boxes, labels = self.transform(img, target[:, :4], target[:, 4])
-            # to rgb
-            img = img[:, :, (2, 1, 0)]
-
-        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
-        # return torch.from_numpy(img), target, height, width
-
+        

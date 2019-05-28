@@ -58,6 +58,15 @@ then go to localhost:8888 by default to see the demo.
 
 
 
+# Eval on VOC2007
+Now I provide code to eval on VOC2007 testset, I use [Detectron's](https://github.com/facebookresearch/Detectron/blob/master/detectron/datasets/voc_eval.py) voc_eval.py to calculate MAP, to eval your model, just run
+```Shell
+python eval.py --model=weights/VOC_LAST.pth --save_folder=result
+```
+MAP result will show in your screen</br></br>
+- something to notice</br>
+--model is your model checkpoint to eval, after running those script a annotations_cache folder and a result(--save_folder) folder will show in this workspace. result folder contains prediction for each class.
+
 
 ## References
 - Wei Liu, et al. "SSD: Single Shot MultiBox Detector." [ECCV2016](http://arxiv.org/abs/1512.02325).

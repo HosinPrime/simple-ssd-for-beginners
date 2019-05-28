@@ -1,103 +1,154 @@
+'''
+This data augmentation part are taking from https://github.com/Hakuyume/chainer-ssd/blob/master/lib/transforms.py
+'''
 
 
-import numpy as np
+
 import cv2
-from numpy import random
+import numpy as np
+import random
+
+from lib.utils import bbox_iou
 
 
-class Compose(object):
-    """Composes several augmentations together.
-    Args:
-        transforms (List[Transform]): list of transforms to compose.
-    Example:
-        >>> augmentations.Compose([
-        >>>     transforms.CenterCrop(10),
-        >>>     transforms.ToTensor(),
-        >>> ])
-    """
+def _crop(image, boxes, labels):
+    height, width, _ = image.shape
 
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def __call__(self, img, boxes=None, labels=None):
-        for t in self.transforms:
-            img, boxes, labels = t(img, boxes, labels)
-        return img, boxes, labels
-
-
-
-
-class ConvertFromInts(object):
-    def __call__(self, image, boxes=None, labels=None):
-        return image.astype(np.float32), boxes, labels
-
-
-class SubtractMeans(object):
-    def __init__(self, mean):
-        self.mean = np.array(mean, dtype=np.float32)
-
-    def __call__(self, image, boxes=None, labels=None):
-        image = image.astype(np.float32)
-        image -= self.mean
-        return image.astype(np.float32), boxes, labels
-
-
-class ToAbsoluteCoords(object):
-    def __call__(self, image, boxes=None, labels=None):
-        height, width, channels = image.shape
-        boxes[:, 0] *= width
-        boxes[:, 2] *= width
-        boxes[:, 1] *= height
-        boxes[:, 3] *= height
-
+    if len(boxes) == 0:
         return image, boxes, labels
 
+    while True:
+        mode = random.choice((
+            None,
+            (0.1, None),
+            (0.3, None),
+            (0.7, None),
+            (0.9, None),
+            (None, None),
+        ))
 
-class ToPercentCoords(object):
-    def __call__(self, image, boxes=None, labels=None):
-        height, width, channels = image.shape
-        boxes[:, 0] /= width
-        boxes[:, 2] /= width
-        boxes[:, 1] /= height
-        boxes[:, 3] /= height
+        if mode is None:
+            return image, boxes, labels
 
-        return image, boxes, labels
+        min_iou, max_iou = mode
+        if min_iou is None:
+            min_iou = float('-inf')
+        if max_iou is None:
+            max_iou = float('inf')
+
+        for _ in range(50):
+            w = random.randrange(int(0.3 * width), width)
+            h = random.randrange(int(0.3 * height), height)
+
+            if h / w < 0.5 or 2 < h / w:
+                continue
+
+            l = random.randrange(width - w)
+            t = random.randrange(height - h)
+            roi = np.array((l, t, l + w, t + h))
+
+            iou = bbox_iou(boxes, roi[np.newaxis])
+            if not (min_iou <= iou.min() and iou.max() <= max_iou):
+                continue
+
+            image = image[roi[1]:roi[3], roi[0]:roi[2]]
+
+            centers = (boxes[:, :2] + boxes[:, 2:]) / 2
+            mask = np.logical_and(roi[:2] < centers, centers < roi[2:]) \
+                     .all(axis=1)
+            boxes = boxes[mask].copy()
+            labels = labels[mask]
+
+            boxes[:, :2] = np.maximum(boxes[:, :2], roi[:2])
+            boxes[:, :2] -= roi[:2]
+            boxes[:, 2:] = np.minimum(boxes[:, 2:], roi[2:])
+            boxes[:, 2:] -= roi[:2]
+
+            return image, boxes, labels
 
 
-class Resize(object):
-    def __init__(self, size=300):
-        self.size = size
+def _distort(image):
+    def _convert(image, alpha=1, beta=0):
+        tmp = image.astype(float) * alpha + beta
+        tmp[tmp < 0] = 0
+        tmp[tmp > 255] = 255
+        image[:] = tmp
 
-    def __call__(self, image, boxes=None, labels=None):
-        image = cv2.resize(image, (self.size,
-                                 self.size))
-        return image, boxes, labels
+    image = image.copy()
+
+    if random.randrange(2):
+        _convert(image, beta=random.uniform(-32, 32))
+
+    if random.randrange(2):
+        _convert(image, alpha=random.uniform(0.5, 1.5))
+
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    if random.randrange(2):
+        tmp = image[:, :, 0].astype(int) + random.randint(-18, 18)
+        tmp %= 180
+        image[:, :, 0] = tmp
+
+    if random.randrange(2):
+        _convert(image[:, :, 1], alpha=random.uniform(0.5, 1.5))
+
+    image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
+
+    return image
 
 
+def _expand(image, boxes, fill):
+    if random.randrange(2):
+        return image, boxes
 
-class RandomMirror(object):
-    def __call__(self, image, boxes, classes):
-        _, width, _ = image.shape
-        if random.randint(2):
-            image = image[:, ::-1]
-            boxes = boxes.copy()
-            boxes[:, 0::2] = width - boxes[:, 2::-2]
-        return image, boxes, classes
+    height, width, depth = image.shape
+    ratio = random.uniform(1, 4)
+    left = random.randint(0, int(width * ratio) - width)
+    top = random.randint(0, int(height * ratio) - height)
+
+    expand_image = np.empty(
+        (int(height * ratio), int(width * ratio), depth),
+        dtype=image.dtype)
+    expand_image[:, :] = fill
+    expand_image[top:top + height, left:left + width] = image
+    image = expand_image
+
+    boxes = boxes.copy()
+    boxes[:, :2] += (left, top)
+    boxes[:, 2:] += (left, top)
+
+    return image, boxes
 
 
+def _mirror(image, boxes):
+    _, width, _ = image.shape
+    if random.randrange(2):
+        image = image[:, ::-1]
+        boxes = boxes.copy()
+        boxes[:, 0::2] = width - boxes[:, 2::-2]
+    return image, boxes
 
-class SSDAugmentation(object):
-    def __init__(self, size=300, mean=(104, 117, 123)):
-        self.mean = mean
-        self.size = size
-        self.augment = Compose([
-            ConvertFromInts(),
-            ToAbsoluteCoords(),
-            RandomMirror(),
-            ToPercentCoords(),
-            Resize(self.size),
-            SubtractMeans(self.mean)
-        ])
 
-    def __call__(self, img, boxes, labels):
-        return self.augment(img, boxes, labels)
+def preproc_for_test(image, insize, mean):
+    image = cv2.resize(image, (insize, insize))
+    image = image.astype(np.float32)
+    image -= mean
+    return image.transpose(2, 0, 1)
+
+
+def preproc_for_train(image, boxes, labels, insize, mean):
+    if len(boxes) == 0:
+        boxes = np.empty((0, 4))
+
+    image, boxes, labels = _crop(image, boxes, labels)
+    image = _distort(image)
+    image, boxes = _expand(image, boxes, mean)
+    image, boxes = _mirror(image, boxes)
+
+    height, width, _ = image.shape
+    image = preproc_for_test(image, insize, mean)
+    boxes = boxes.copy()
+    boxes[:, 0::2] /= width
+    boxes[:, 1::2] /= height
+
+    return image, boxes, labels

@@ -7,13 +7,13 @@ class Config:
 
 	
     #存放voc数据集的地址
-    VOC_ROOT = '/unsullied/sharefs/liuhaoxin/isilon-home/data/VOC/VOCdevkit'
+    VOC_ROOT = '/Users/liuhaoxin/data/VOC/VOCdevkit'
 
     #分类的类别数(包括了背景算一类)
     num_classes = 21
 
-    #如果你想从已经训练的掉开始训练则取消注释下一行,从头训练的话保持原样
-    #resume = 'weights/latest.pth'
+    #如果你想从已经训练的模型继续训练则取消注释下一行并填入你继续训练模型的名字,从头训练的话保持原样
+    #resume = 'weights/loss-2079.08.pth'
     resume = None
     
     #下面是一些常用模型训练的参数,根据需要进行更改
@@ -31,16 +31,16 @@ class Config:
     epoch = 100 
 
     #这两个参数可以进行调节,lr_reduce_epoch是多少个epoch后学习率乘上gamma
-    #比如gamma为0.1,lr_reduce_epoch=30即每隔30个epoch，学习率降低10倍
+    #比如gamma为0.2,lr_reduce_epoch=30即每隔30个epoch，学习率降低5倍
     gamma = 0.2
     lr_reduce_epoch = 30
 
 
-    #模型保存的文件夹，在该文件家中主干网参数的名称
+    #模型保存的文件夹，以及预训练的网络权重
     save_folder = 'weights/'
     basenet = 'vgg16_reducedfc.pth'
 
-    #每隔多少个batch答应一次信息
+    #每训练多少个batch打印一次信息
     log_fn = 10 
 
 
