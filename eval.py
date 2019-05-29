@@ -102,7 +102,7 @@ if __name__ == '__main__':
         loc = loc.cpu().numpy()
 
         decode_loc = multibox_encoder.decode(loc)
-        gt_boxes, gt_confs, gt_labels = detect(decode_loc, conf, nms_threshold=0.45, gt_threshold=0.1)
+        gt_boxes, gt_confs, gt_labels = detect(decode_loc, conf, nms_threshold=0.5, gt_threshold=0.01)
 
         #no object detected
         if len(gt_boxes) == 0:
@@ -116,7 +116,7 @@ if __name__ == '__main__':
 
 
         for box, label, score in zip(gt_boxes, gt_labels, gt_confs):
-            print(img_name, score, *box, file=files[label])
+            print(img_name, "{:.3f}".format(score), "{:.1f} {:.1f} {:.1f} {:.1f}".format(*box), file=files[label])
 
 
     for f in files:

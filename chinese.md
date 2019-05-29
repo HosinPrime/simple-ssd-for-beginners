@@ -5,12 +5,14 @@
 # 代码组织
 - train.py    实现了模型的训练部分的代码
 - voc_dataset.py    voc数据的读取
+- eval.py     在voc上计算MAP
 - lib    包括ssd实现的一些模块
     * augmentations.py    数据增强
     * model.py    定义了网络模型
     * ssd_loss.py    定义了损失以及难样本挖掘
     * multibox_endoder.py    实现了anchor的生成以及怎么把这些anchor与一张图上的真实物体匹配上并编码
     * utils.py    一些工具，包括计算iou,nms等目标检测中常见的概念
+    * voc_eval.py   测试voc分数的工具，不用管
 
 - config.py    配置文件，所需要的所有参数都在这里面进行配置
 - demo.ipynb    demo文件
@@ -22,7 +24,18 @@
 ```Shell
 conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
 ```
-- 下载[VOC2007](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar)和[VOC2012](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar)，然后将VOC2007和VOC2012都放到同一个文件夹下面，文件夹的结构会类似于
+- 下载[VOC2007训练验证集](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar)和[VOC2012训练验证集](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar)以及[VOC2007测试集](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar)，然后将VOC2007和VOC2012都放到同一个文件夹下面</br>
+或者你是在linux系统下面并且能够联网的话,直接按顺序运行
+```Shell
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
+
+tar xvf VOCtrainval_06-Nov-2007.tar
+tar xvf VOCtrainval_11-May-2012.tar
+tar xvf VOCtest_06-Nov-2007.tar
+```
+你的路径下的结构将会是
 ```
 ~/VOCdevkit/
     -- VOC2007
@@ -63,7 +76,7 @@ ps -ef|grep -w train|grep -v grep|cut -c 9-15|xargs kill -9
 # Demo
 我并没有在VOC测试集上面测试模型的准确度，但是仍然提供了一个demo来人肉查看检测的结果，可以使用你训练出来的模型，也可以使用</br>
 链接:https://pan.baidu.com/s/1V2bRX1EogjU7JV_G2NRTDA  密码:u16q </br>
-的latest.pth或者VOC_LAST.pth
+里面带有loss的模型来进行demo演示，其中loss越小代表训练的时间越久
 ```Shell
 jupyter notebook
 ```
@@ -75,13 +88,20 @@ jupyter notebook
 # 测试
 现在提供了测试代码在VOC2007 testset上面计算MAP,MAP的计算函数是从FaceBook开源的[Detectron](https://github.com/facebookresearch/Detectron/blob/master/detectron/datasets/voc_eval.py)里面拿过来的,然后eval部分的代码基本与demo之中保持一致.进行MAP的计算请运行
 ```Shell
-python eval.py --model=weights/VOC_LAST.pth --save_folder=result
+python eval.py --model=weights/loss-1220.37.pth  --save_folder=result
 ```
 程式运行完毕会在屏幕打印出各类别的map以及平均的map</br></br>
 - 一些注意点</br>
-其中model是你训练出的存放在weights里面用来测map的模型点,save_folder是存放每一类预测结果的文件夹,运行完程序后会生成一个result(--save_folder的参数)文件夹和一个annotations_cache文件夹，其中annotations_cache文件夹是MAP计算的时候存放真实标注临时信息的文件夹,由MAP计算函数产生
+其中model是你训练出的存放在weights里面用来测MAP的模型点,save_folder是存放每一类预测结果的文件夹,运行完程序后会生成一个result(--save_folder的参数)文件夹和一个annotations_cache文件夹，其中annotations_cache文件夹是MAP计算的时候存放真实标注临时信息的文件夹,由MAP计算函数产生
     * Todo
         * 尽可能训练一个map高的模型
+
+
+# Results
+|              Implementation              |     mAP     |
+| :--------------------------------------: | :---------: |
+| [origin paper](http://arxiv.org/abs/1512.02325) |    0.772    |
+|    this repo(eval using unofficial voc_eval code)    | 0.73-0.75 |
 
 
 ## 引用

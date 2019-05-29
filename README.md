@@ -1,6 +1,23 @@
-# SSD : A simple ssd implementation using only pytorch and numpy
+# SSD : A very very simple ssd implementation using only pytorch and numpy
 
-This repo contains some simple codes for me to learn the basic of object detection [中文请点击](https://github.com/HosinPrime/simple-ssd-for-beginners/blob/master/chinese.md), SSD is a somewhat simple but powerful model to get started. So I try to implement it by myself, hoping I can get more insight in object dectection land. It's really amazing with deep learning and little code that machines can catch object show in the world. I hope this repo will help people who want to learn object detection and feel hard to get started.
+This repo contains some simple codes for me to learn the basic of object detection [中文请点击](https://github.com/HosinPrime/simple-ssd-for-beginners/blob/master/chinese.md), [SSD](http://arxiv.org/abs/1512.02325)(Single Shot MultiBox Detector) is a somewhat simple but powerful model to get started. So I try to implement it by myself, hoping I can get more insight in object dectection land. It's really amazing with deep learning and little code that machines can catch object show in the world. I try to reimplement it more readable and with clear codes. I hope this repo will help people who want to learn object detection and feel hard to get started.
+
+
+
+# Code structure
+- train.py    
+- voc_dataset.py    
+- eval.py
+- lib    
+    * augmentations.py    
+    * model.py    
+    * ssd_loss.py    
+    * multibox_endoder.py    
+    * utils.py    
+    * voc_eval.py   
+
+- config.py    
+- demo.ipynb   
 
 
 # getting started
@@ -10,7 +27,18 @@ conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
 ``` 
 for example.
 
-- download [VOC2007](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar) and [VOC2012](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar), extract them and put them in a folder, the structures would like
+- download [VOC2007 trainval](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar) and [VOC2012 trainval](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar), download [VOC2007 testset](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar), extract them and put them in a folder</br>
+if you are using a linux machine, simple run
+```Shell
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
+
+tar xvf VOCtrainval_06-Nov-2007.tar
+tar xvf VOCtrainval_11-May-2012.tar
+tar xvf VOCtest_06-Nov-2007.tar
+```
+the structures would like
 ```
 ~/VOCdevkit/
     -- VOC2007
@@ -61,11 +89,17 @@ then go to localhost:8888 by default to see the demo.
 # Eval on VOC2007
 Now I provide code to eval on VOC2007 testset, I use [Detectron's](https://github.com/facebookresearch/Detectron/blob/master/detectron/datasets/voc_eval.py) voc_eval.py to calculate MAP, to eval your model, just run
 ```Shell
-python eval.py --model=weights/VOC_LAST.pth --save_folder=result
+python eval.py --model=weights/loss-1220.37.pth --save_folder=result
 ```
 MAP result will show in your screen</br></br>
 - something to notice</br>
 --model is your model checkpoint to eval, after running those script a annotations_cache folder and a result(--save_folder) folder will show in this workspace. result folder contains prediction for each class.
+
+# Results
+|              Implementation              |     mAP     |
+| :--------------------------------------: | :---------: |
+| [origin paper](http://arxiv.org/abs/1512.02325) |    0.772    |
+|    this repo(eval using unofficial voc_eval code)    | 0.73-0.75 |
 
 
 ## References
